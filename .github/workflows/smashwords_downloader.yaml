@@ -1,0 +1,13 @@
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "cmd/smashwords-downloader/**"
+      - ".github/workflows/ko_build.yaml"
+      - ".github/workflows/smashwords_downloader.yaml"
+
+jobs:
+  build:
+    uses: ./.github/workflows/ko_build.yaml
+    with:
+      folder: smashwords-downloader
