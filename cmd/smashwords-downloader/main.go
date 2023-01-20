@@ -15,7 +15,7 @@ import (
 
 const (
 	smashWordsURL    string = "www.smashwords.com"
-	localCacheDir    string = "./smashwords_cache"
+	localCacheDir    string = "/tmp/smashwords_cache"
 	westernRomanceID int    = 1245
 	maxPageId        int    = 140
 	bookListSize     int    = 20 // Number of books on each smashwords list page
@@ -26,7 +26,7 @@ func createBookFileName(title string) string {
 	re := regexp.MustCompile(`[^\w]`)
 	fileName := re.ReplaceAllString(title, "")
 
-	return fileName
+	return fmt.Sprintf("%s.txt", fileName)
 }
 
 func downloadBook(title string, bookLink string, dataDir string) {
@@ -40,7 +40,9 @@ func downloadBook(title string, bookLink string, dataDir string) {
 	fullUrl := fmt.Sprintf("https://%s%s", smashWordsURL, bookLink)
 
 	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
-		os.MkdirAll(dataDir, 0700)
+		if err := os.MkdirAll(dataDir, 0700); err != nil {
+			log.Fatal(err)
+		}
 	}
 	file, err := os.Create(filePath)
 	if err != nil {
@@ -81,6 +83,10 @@ func scrapeBookList(pageId int, dataDir string) {
 	// Before making a request print "Visiting ..."
 	listCollector.OnRequest(func(r *colly.Request) {
 		log.Println("Getting book links from", r.URL.String())
+	})
+
+	listCollector.OnError(func(r *colly.Response, err error) {
+		log.Println("Request URL:", r.Request.URL, "failed with status code:", r.StatusCode, "Error:", err)
 	})
 
 	// Send all the individual book links through the book collector
