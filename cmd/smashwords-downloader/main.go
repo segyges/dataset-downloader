@@ -7,7 +7,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"regexp"
+	"strconv"
 	"sync"
 
 	"github.com/gocolly/colly"
@@ -131,6 +133,9 @@ func main() {
 
 	textFormatPtr := flag.String("format", "txt",
 		"The format of the book to download. Options are 'txt' or 'epub'")
+
+	overwriteSourcePtr := flag.Bool("overwriteSource", true,
+		"Save the original file after converting it to the desired format")
 	flag.Parse()
 
 	totalBooks := *itemsPerPagePtr * *pagesPtr
@@ -138,7 +143,7 @@ func main() {
 	//log the flag parameters out to console
 	log.Printf("Scraping %d pages of %d items, (total is %d) each from smashwords url %d.\n", *pagesPtr, *itemsPerPagePtr, totalBooks, *urlIDPtr)
 	log.Printf("Selected format is %s.\n", *textFormatPtr)
-	log.Printf("Saving files to %s.\n", *dataDirPtr)
+	log.Printf("Saving files to %s folder.\n", *dataDirPtr)
 
 	// Create a wait group to wait for all the goroutines to finish
 	wg := new(sync.WaitGroup)
@@ -153,4 +158,21 @@ func main() {
 	}
 
 	wg.Wait()
+
+	//convert epub to txt if needed
+	if *textFormatPtr == "epub" {
+
+		ConvertEpub(*dataDirPtr, *overwriteSourcePtr)
+	}
+}
+
+func ConvertEpub(inputdir string, overwriteSource bool) {
+	//invoke python script to convert epub to txt
+	cmd := exec.Command("python", "epubconvert.py", inputdir, inputdir, strconv.FormatBool(overwriteSource))
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		fmt.Println("Error: ", err)
+	}
 }

@@ -29,8 +29,18 @@ The `main.go` script takes the following arugments:
 
   -format string
         The format of text you want to download, some books only have limited format avaliability.
-        (default is txt for .txt files), options are (txt, epub)
+        (default is txt for .txt files), options are (txt, epub). Note: Not all books have all formats.
+        You may get significantly less books downloaded then specified based on file format.
+
+  -overwriteSource bool
+        If you are downloading in a format other then txt (ex. EPUB), set this to true if you
+        don't want to keep the source files, and just want to keep the .txt files (default true)
 ```
 
 Example Execution
-./main -data_dir data2 -id 1105 -pageitem 20 -pages 10 -format txt
+
+Download Western Romance novels in .txt format to directory data
+>./main -data_dir data
+
+Download Adventure novels to directory data, downloading 20 items (don't change this), 10 pages (total 200 items) in epub format, converting to text and overwriting source folder
+> ./main -data_dir data -id 1105 -pageitem 20 -pages 10 -format epub -overwriteSource=true
