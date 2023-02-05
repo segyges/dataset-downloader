@@ -1,0 +1,86 @@
+All Works 1
+Screenplays 2
+Fiction 3
+Nonfiction 4
+Poetry 56
+Literature 57
+Graphic novels  & comics 58
+Plays  & Screenplays 60
+Children’s books 61
+Anthologies 62
+Weddings 63
+Travel 64
+Transportation 65
+Sports  & outdoor recreation 66
+Social Science 67
+Sex  & Relationships  68
+Self-improvement 69
+Science  & Nature 70
+Religion  & Spirituality 71
+Relationships  & Family 72
+Reference 73
+Psychology 74
+Politics  & Current Affairs 75
+Philosophy 76
+Parenting 77
+New Age 78
+Music 79
+Law 80
+Language Instruction 81
+Inspiration 82
+Home  & Garden 83
+History 84
+Healthwellbeing & medicine 85
+Gay  & Lesbian 86
+Entertainment 87
+Education  & Study Guides 88
+CookingFoodWineSpirits 89
+Computers  & Internet 90
+Children's Books 91
+Career Guides 92
+Business  & Economics 93
+Biography 94
+ArtArchitecturePhotography 95
+Antiques  & Collectibles 96
+Women's fiction 870
+Western 871
+Urban 873
+Thriller  & suspense 874
+Religious 877
+Mystery  & detective 879
+Literary criticism 880
+Humor  & comedy 882
+Horror 883
+Historical 884
+Gay  & lesbian fiction 886
+Fairy tales 887
+Adventure 892
+Business 895
+Educational 896
+Essay 898
+Transgressional fiction 1001
+Young adult or teen 1018
+Publishing 1044
+True Crime 1049
+Holiday 1067
+Visionary  & metaphysical 1091
+Coming of age 1095
+Biographical 1105
+Alternative history 1106
+Sports 1126
+Fantasy 1206
+Science fiction 1213
+Christian 1223
+Romance 1235
+African American fiction 1248
+Cultural  & ethnic themes 1332
+Themes  & motifs 1337
+Classics 1348
+Mashups 1350
+Inspirational 1527
+Plays 2044
+Engineeringtrades & technology 2369
+Literary collections 4815
+General reference 4816
+Comics (nonfictional) 4856
+Young adult or teen 5030
