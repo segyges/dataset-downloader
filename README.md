@@ -10,7 +10,7 @@ Contents:
 This script downloads plain text files of Western Romance books publicaly avaible on [Smashworks](https://www.smashwords.com/). This website has been used to create popular Machine Learning datasets like [BookCorpus](https://huggingface.co/datasets/bookcorpus).
 
 The source code located in `cmd/smashwords-downloader`. 
-It can be built into an executable with the command `go build *.go`.
+It can be built into an executable with the command `go build -o main *.go`.
 
 The `main.go` script takes the following arugments:
 ```
@@ -29,7 +29,7 @@ The `main.go` script takes the following arugments:
 
   -format string
         The format of text you want to download, some books only have limited format avaliability.
-        (default is txt for .txt files), options are (txt, epub). Note: Not all books have all formats.
+        (default is all for .txt and .epub files), options are (all, txt, epub). Note: Not all books have all formats.
         You may get significantly less books downloaded then specified based on file format.
 
   -overwriteSource bool

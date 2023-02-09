@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -13,43 +12,15 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode"
-
-	termbox "github.com/nsf/termbox-go"
-	"golang.org/x/net/html"
-	"golang.org/x/net/html/atom"
 
 	"github.com/gocolly/colly"
 	"github.com/taylorskalyo/goreader/epub"
 )
 
 const (
-	smashWordsURL    string = "www.smashwords.com"
-	localCacheDir    string = "/tmp/smashwords_cache"
-	westernRomanceID int    = 1245
-	maxPageId        int    = 140
-	bookListSize     int    = 20 // Number of books on each smashwords list page
+	smashWordsURL string = "www.smashwords.com"
+	localCacheDir string = "/tmp/smashwords_cache"
 )
-
-//parser is a part of the goreader repo for parsing epubs
-type parser struct {
-	tagStack  []atom.Atom
-	tokenizer *html.Tokenizer
-	doc       cellbuf
-	items     []epub.Item
-	sb        strings.Builder
-}
-
-//cellbuf is a part of the goreader repo for parsing epubs
-type cellbuf struct {
-	cells   []termbox.Cell
-	width   int
-	lmargin int
-	col     int
-	row     int
-	space   bool
-	fg, bg  termbox.Attribute
-}
 
 func createBookFileName(title string, textFormat string) string {
 	// Remove all non-alphanumeric characters from the title
@@ -60,6 +31,9 @@ func createBookFileName(title string, textFormat string) string {
 }
 
 func downloadBook(title string, bookLink string, dataDir string, textFormat string) {
+	// We can't declare const arrays, so we have to do this
+	SUPPORTEDFORMATS := [2]string{"epub", "txt"}
+
 	fileName := createBookFileName(title, textFormat)
 	if fileName == "" {
 		log.Printf("Skipping %s since the title is all symbols (probably not English)", title)
@@ -78,6 +52,18 @@ func downloadBook(title string, bookLink string, dataDir string, textFormat stri
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// We check if the file already exists before downloading it (including other formats)
+	for _, format := range SUPPORTEDFORMATS {
+		potentialFilePath := dataDir + "/" + createBookFileName(title, format)
+		if _, err := os.Stat(potentialFilePath); err == nil {
+			log.Printf("Skipping %s for %s format since it already exists in %s format", title, textFormat, format)
+			return
+		} else if !os.IsNotExist(err) {
+			log.Printf("Error checking if file exists")
+		}
+	}
+
 	client := http.Client{
 		CheckRedirect: func(r *http.Request, via []*http.Request) error {
 			r.URL.Opaque = r.URL.Path
@@ -128,15 +114,23 @@ func scrapeBookList(pageId int, dataDir string, urlID int, textFormat string) {
 	// Get the text file link and download when available
 	bookCollector.OnHTML("div[id=pageContentFull]", func(e *colly.HTMLElement) {
 		title := e.ChildText("h1")
-		search := "a[title='Plain text; contains no formatting']"
-		if textFormat == "epub" {
-			search = "a[title='Supported by many apps and devices (e.g., Apple Books, Barnes and Noble Nook, Kobo, Google Play, etc.)']"
+
+		// We check if the book is available in the requested format
+		if textFormat == "txt" || textFormat == "all" {
+			search := "a[title='Plain text; contains no formatting']"
+			e.ForEach(search, func(_ int, e *colly.HTMLElement) {
+				book_link := e.Attr("href")
+				downloadBook(title, book_link, dataDir, "txt")
+			})
+		}
+		if textFormat == "epub" || textFormat == "all" {
+			search := "a[title='Supported by many apps and devices (e.g., Apple Books, Barnes and Noble Nook, Kobo, Google Play, etc.)']"
+			e.ForEach(search, func(_ int, e *colly.HTMLElement) {
+				book_link := e.Attr("href")
+				downloadBook(title, book_link, dataDir, "epub")
+			})
 		}
 
-		e.ForEach(search, func(_ int, e *colly.HTMLElement) {
-			book_link := e.Attr("href")
-			downloadBook(title, book_link, dataDir, textFormat)
-		})
 	})
 
 	smashwordsCategoryURL := fmt.Sprintf("https://%s/books/category/%d/downloads/0/free/any/%d", smashWordsURL, urlID, pageId)
@@ -144,7 +138,7 @@ func scrapeBookList(pageId int, dataDir string, urlID int, textFormat string) {
 }
 
 func main() {
-	//flags used: -url is the url to scrape,
+	// flags used: -url is the url to scrape,
 	// -data_dir is the directory to save the files to
 	dataDirPtr := flag.String("data_dir", "./data",
 		"directory that the book files will download to")
@@ -159,8 +153,9 @@ func main() {
 	pagesPtr := flag.Int("pages", 7,
 		"The number of pages to scrape")
 
-	textFormatPtr := flag.String("format", "txt",
-		"The format of the book to download. Options are 'txt' or 'epub'")
+	textFormatPtr := flag.String("format", "all",
+		"The format of the book to download. Options are 'all', 'txt' or 'epub'"+
+			" (default is 'all' for getting all formats avaliable)")
 
 	overwriteSourcePtr := flag.Bool("overwriteSource", true,
 		"Save the original file after converting it to the desired format")
@@ -168,7 +163,7 @@ func main() {
 
 	totalBooks := *itemsPerPagePtr * *pagesPtr
 
-	//log the flag parameters out to console
+	// log the flag parameters out to console
 	log.Printf("Scraping %d pages of %d items, (total is %d) each from smashwords url %d.\n", *pagesPtr, *itemsPerPagePtr, totalBooks, *urlIDPtr)
 	log.Printf("Selected format is %s.\n", *textFormatPtr)
 	log.Printf("Saving files to %s folder.\n", *dataDirPtr)
@@ -187,38 +182,45 @@ func main() {
 
 	wg.Wait()
 
-	//convert epub to txt if needed
-	if *textFormatPtr == "epub" {
-
+	// convert epub to txt if needed
+	if *textFormatPtr == "epub" || *textFormatPtr == "all" {
 		ConvertEpubGo(*dataDirPtr, *overwriteSourcePtr)
 	}
 }
 
-//A lot of the actual parsing is done with this repo: https://github.com/taylorskalyo/goreader
+// A lot of the actual parsing is done with this repo: https://github.com/taylorskalyo/goreader
 func ConvertEpubGo(inputdir string, overwriteSource bool) {
-	//get all files in directory
-	files, err := ioutil.ReadDir(inputdir)
+	// get all files in directory
+	files, err := os.ReadDir(inputdir)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	//we time the parsing
+	// we time the parsing
 	start := time.Now()
 
-	//we count the number of characters
+	// we count the number of characters
 	charCount := 0
 
-	//for each file, if it is an epub, convert it to txt
+	// for each file, if it is an epub, convert it to txt
 	for _, file := range files {
 		if strings.HasSuffix(file.Name(), ".epub") {
 			filepath := inputdir + "/" + file.Name()
 
-			//We use the goreader library to parse the epub
+			// we check if we are being rate limited, if we are,
+			// we don't parse the rest of the files (since they will be rate limited too)
+			isRateLimited := CheckRateLimit(filepath)
+			if isRateLimited {
+				log.Fatal("Rate limited by smashwords. Please try again later. (up to 500/24 hours)")
+				break
+			}
+
+			// We use the goreader library to parse the epub
 			rc, err := epub.OpenReader(filepath)
 			if err != nil {
-				panic(err)
+				log.Fatal(err)
 			}
-			defer rc.Close()
+
 			// The rootfile (content.opf) lists all of the contents of an epub file.
 			// There may be multiple rootfiles, although typically there is only one.
 			book := rc.Rootfiles[0]
@@ -226,10 +228,10 @@ func ConvertEpubGo(inputdir string, overwriteSource bool) {
 			// Print book title.
 			fmt.Println("Parsing book: ", book.Title, "(file: ", file.Name()+")")
 
-			//stringbuilder to hold the text instead of using goreader's cell system
+			// stringbuilder to hold the text instead of using goreader's cell system
 			var sb strings.Builder
 
-			//generate output file name and file
+			// generate output file name and file
 			outputFileName := strings.TrimSuffix(file.Name(), ".epub") + ".txt"
 			outputFilePath := inputdir + "/" + outputFileName
 			outputFile, err := os.Create(outputFilePath)
@@ -238,30 +240,31 @@ func ConvertEpubGo(inputdir string, overwriteSource bool) {
 			}
 			defer outputFile.Close()
 
-			//iterate through each chapter in the book
+			// iterate through each chapter in the book
 			for _, itemref := range book.Spine.Itemrefs {
 				f, err := itemref.Open()
 				if err != nil {
 					panic(err)
 				}
 
-				//parse the chapter into the stringbuilder
-				sbret, err := parseText(f, book.Manifest.Items, sb)
+				// parse the chapter into the stringbuilder
+				sbret, err := ParseText(f, book.Manifest.Items, sb)
 				if err != nil {
 					log.Fatal(err)
 				}
-				//get the string from the stringbuilder
+				// get the string from the stringbuilder
 				chapterStr := strings.ReplaceAll(sbret.String(), "	", "")
 				charCount += len(chapterStr)
 
-				//writes to file
+				// writes to file
 				outputFile.Write([]byte(chapterStr))
 
 				// Close the itemref.
 				f.Close()
 
-				//clear the stringbuilder
+				// clear the stringbuilder
 				sb.Reset()
+
 			}
 
 			//if overwriteSource is true, delete the original epub file
@@ -272,6 +275,9 @@ func ConvertEpubGo(inputdir string, overwriteSource bool) {
 				}
 			}
 
+			// Close the rootfile.
+			rc.Close()
+
 		}
 
 	}
@@ -281,163 +287,37 @@ func ConvertEpubGo(inputdir string, overwriteSource bool) {
 	}
 }
 
-// parseText takes in html content via an io.Reader and returns a buffer
-// containing only plain text.
-func parseText(r io.Reader, items []epub.Item, sb strings.Builder) (strings.Builder, error) {
-	tokenizer := html.NewTokenizer(r)
-	doc := cellbuf{width: 80}
-	p := parser{tokenizer: tokenizer, doc: doc, items: items, sb: sb}
-	err := p.parse(r)
+// We check if we are being rate limited on epub files by scanning the epub downloaded for a string, returns true if we are being rate limited
+func CheckRateLimit(inputdir string) bool {
+	searchstring := "We are currently throttling downloads for users who download more than 500 per day,"
+
+	//we get the one epub file in the directory
+	file, err := os.Open(inputdir)
 	if err != nil {
-		return p.sb, err
+		log.Fatal(err)
 	}
-	return p.sb, nil
-}
+	defer file.Close()
 
-// parse walks an html document and renders elements to a cell buffer document.
-func (p *parser) parse(io.Reader) (err error) {
-	for {
-		tokenType := p.tokenizer.Next()
-		token := p.tokenizer.Token()
-		switch tokenType {
-		case html.ErrorToken:
-			err = p.tokenizer.Err()
-		case html.StartTagToken:
-			p.tagStack = append(p.tagStack, token.DataAtom) // push element
-			fallthrough
-		case html.SelfClosingTagToken:
-			p.handleStartTag(token)
-		case html.TextToken:
-			p.handleText(token)
-		case html.EndTagToken:
-			p.tagStack = p.tagStack[:len(p.tagStack)-1] // pop element
-		}
-		if err == io.EOF {
-			return nil
-		} else if err != nil {
-			return err
-		}
+	//we also check if the file is empty
+	fileInfo, err := file.Stat()
+	if err != nil {
+		log.Fatal(err)
 	}
-}
-
-// handleText appends text elements to the parser buffer. It filters elements
-// that should not be displayed as text (e.g. style blocks).
-func (p *parser) handleText(token html.Token) {
-	// Skip style tags
-	if len(p.tagStack) > 0 && p.tagStack[len(p.tagStack)-1] == atom.Style {
-		return
+	if fileInfo.Size() == 0 {
+		log.Printf("File is empty")
+		return true
 	}
-	p.doc.style(p.tagStack)
-	//I think the appendText is needed to properly parse the tags
-	p.doc.appendText(string(token.Data))
-	p.sb.WriteString(string(token.Data))
 
-}
-
-// handleStartTag appends text representations of non-text elements (e.g. image alt
-// tags) to the parser buffer.
-func (p *parser) handleStartTag(token html.Token) {
-	switch token.DataAtom {
-	case atom.Img:
-		// Display alt text in place of images.
-		for _, a := range token.Attr {
-			switch atom.Lookup([]byte(a.Key)) {
-			case atom.Alt:
-				text := fmt.Sprintf("Alt text: %s", a.Val)
-				p.doc.appendText(text)
-				p.doc.row++
-				p.doc.col = p.doc.lmargin
-			case atom.Src:
-				for _, item := range p.items {
-					if item.HREF == a.Val {
-
-						break
-					}
-				}
-			}
-		}
-	case atom.Br:
-		p.doc.row++
-		p.doc.col = p.doc.lmargin
-	case atom.H1, atom.H2, atom.H3, atom.H4, atom.H5, atom.H6, atom.Title,
-		atom.Div, atom.Tr:
-		p.doc.row += 2
-		p.doc.col = p.doc.lmargin
-	case atom.P:
-		p.doc.row += 2
-		p.doc.col = p.doc.lmargin
-		p.doc.col += 2
-	case atom.Hr:
-		p.doc.row++
-		p.doc.col = 0
-		p.doc.appendText(strings.Repeat("-", p.doc.width))
-	}
-}
-
-// style sets the foreground/background attributes for future cells in the cell
-// buffer document based on HTML tags in the tag stack.
-func (c *cellbuf) style(tags []atom.Atom) {
-	fg := termbox.ColorDefault
-	for _, tag := range tags {
-		switch tag {
-		case atom.B, atom.Strong, atom.Em:
-			fg |= termbox.AttrBold
-		case atom.I:
-			fg |= termbox.ColorYellow
-		case atom.Title:
-			fg |= termbox.ColorRed
-		case atom.H1:
-			fg |= termbox.ColorMagenta
-		case atom.H2:
-			fg |= termbox.ColorBlue
-		case atom.H3, atom.H4, atom.H5, atom.H6:
-			fg |= termbox.ColorCyan
-		}
-	}
-	c.fg = fg
-}
-
-// appendText appends text to the cell buffer document.
-func (c *cellbuf) appendText(str string) {
-	if len(str) <= 0 {
-		return
-	}
-	if c.col < c.lmargin {
-		c.col = c.lmargin
-	}
-	runes := []rune(str)
-	/*
-		if unicode.IsSpace(runes[0]) {
-			c.space = true
-		}*/
-	scanner := bufio.NewScanner(strings.NewReader(str))
-	scanner.Split(bufio.ScanWords)
+	// we read the file
+	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		if c.col != c.lmargin && c.space {
-			c.col++
+		if strings.Contains(scanner.Text(), searchstring) {
+			return true
 		}
-		word := []rune(scanner.Text())
-		if len(word) > c.width-c.col {
-			c.row++
-			c.col = c.lmargin
-		}
-		for _, r := range word {
-			c.setCell(c.col, c.row, r, c.fg, c.bg)
-			c.col++
-		}
-		//c.space = true
 	}
-	if !unicode.IsSpace(runes[len(runes)-1]) {
-		//c.space = false
-	}
-}
 
-// setCell changes a cell's attributes in the cell buffer document at the given
-// position.
-func (c *cellbuf) setCell(x, y int, ch rune, fg, bg termbox.Attribute) {
-	// Grow in steps of 1024 when out of space.
-	for y*c.width+x >= len(c.cells) {
-		c.cells = append(c.cells, make([]termbox.Cell, 1024)...)
+	if err := scanner.Err(); err != nil {
+		log.Fatal(err)
 	}
-	c.cells[y*c.width+x] = termbox.Cell{Ch: ch, Fg: fg, Bg: bg}
+	return false
 }
