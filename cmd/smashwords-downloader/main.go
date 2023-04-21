@@ -153,7 +153,7 @@ func main() {
 	pagesPtr := flag.Int("pages", 7,
 		"The number of pages to scrape")
 
-	textFormatPtr := flag.String("format", "all",
+	textFormatPtr := flag.String("format", "txt",
 		"The format of the book to download. Options are 'all', 'txt' or 'epub'"+
 			" (default is 'all' for getting all formats avaliable)")
 
