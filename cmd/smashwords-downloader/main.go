@@ -154,6 +154,7 @@ func main() {
 		"The number of pages to scrape")
 
 	textFormatPtr := flag.String("format", "txt",
+
 		"The format of the book to download. Options are 'all', 'txt' or 'epub'"+
 			" (default is 'all' for getting all formats avaliable)")
 
@@ -204,6 +205,7 @@ func ConvertEpubGo(inputdir string, overwriteSource bool) {
 
 	// for each file, if it is an epub, convert it to txt
 	for _, file := range files {
+
 		// if it is not an epub, skip it
 		if !strings.HasSuffix(file.Name(), ".epub") {
 			continue
@@ -211,11 +213,13 @@ func ConvertEpubGo(inputdir string, overwriteSource bool) {
 		charCount += ConvertSingleEpub(file, inputdir, overwriteSource)
 	}
 
+
 	if charCount > 0 {
 		elapsed := time.Since(start)
 		fmt.Printf("Parsing took %s, parsed %d characters at a rate of %d characters per second.\n", elapsed, charCount, int(float64(charCount)/elapsed.Seconds()))
 	}
 }
+
 
 func ConvertSingleEpub(file os.DirEntry, inputdir string, overwriteSource bool) int {
 	filepath := inputdir + "/" + file.Name()
@@ -328,6 +332,7 @@ func CheckRateLimit(inputdir string) bool {
 		log.Fatal(err)
 	}
 
+
 	//we also check if the file is empty
 	fileInfo, err = file.Stat()
 	if err != nil {
@@ -337,5 +342,6 @@ func CheckRateLimit(inputdir string) bool {
 		log.Printf("File is empty, probably rate limited\n")
 		return true
 	}
+
 	return false
 }
