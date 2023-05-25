@@ -43,4 +43,6 @@ Download Western Romance novels in .txt format to directory data
 >./main -data_dir data
 
 Download Adventure novels to directory data, downloading 20 items (don't change this), 10 pages (total 200 items) in epub format, converting to text and overwriting source folder
-> ./main -data_dir data -id 1105 -pageitem 20 -pages 10 -format epub -overwriteSource=true
+
+> ./main -data_dir data -id 1105 -pageitems 20 -pages 10 -format epub -overwriteSource=true
+

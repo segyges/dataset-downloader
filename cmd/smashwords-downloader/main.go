@@ -153,7 +153,8 @@ func main() {
 	pagesPtr := flag.Int("pages", 7,
 		"The number of pages to scrape")
 
-	textFormatPtr := flag.String("format", "all",
+	textFormatPtr := flag.String("format", "txt",
+
 		"The format of the book to download. Options are 'all', 'txt' or 'epub'"+
 			" (default is 'all' for getting all formats avaliable)")
 
@@ -204,87 +205,98 @@ func ConvertEpubGo(inputdir string, overwriteSource bool) {
 
 	// for each file, if it is an epub, convert it to txt
 	for _, file := range files {
-		if strings.HasSuffix(file.Name(), ".epub") {
-			filepath := inputdir + "/" + file.Name()
 
-			// we check if we are being rate limited, if we are,
-			// we don't parse the rest of the files (since they will be rate limited too)
-			isRateLimited := CheckRateLimit(filepath)
-			if isRateLimited {
-				log.Fatal("Rate limited by smashwords. Please try again later. (up to 500/24 hours)")
-				break
-			}
-
-			// We use the goreader library to parse the epub
-			rc, err := epub.OpenReader(filepath)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			// The rootfile (content.opf) lists all of the contents of an epub file.
-			// There may be multiple rootfiles, although typically there is only one.
-			book := rc.Rootfiles[0]
-
-			// Print book title.
-			fmt.Println("Parsing book: ", book.Title, "(file: ", file.Name()+")")
-
-			// stringbuilder to hold the text instead of using goreader's cell system
-			var sb strings.Builder
-
-			// generate output file name and file
-			outputFileName := strings.TrimSuffix(file.Name(), ".epub") + ".txt"
-			outputFilePath := inputdir + "/" + outputFileName
-			outputFile, err := os.Create(outputFilePath)
-			if err != nil {
-				log.Fatal(err)
-			}
-			defer outputFile.Close()
-
-			// iterate through each chapter in the book
-			for _, itemref := range book.Spine.Itemrefs {
-				f, err := itemref.Open()
-				if err != nil {
-					panic(err)
-				}
-
-				// parse the chapter into the stringbuilder
-				sbret, err := ParseText(f, book.Manifest.Items, sb)
-				if err != nil {
-					log.Fatal(err)
-				}
-				// get the string from the stringbuilder
-				chapterStr := strings.ReplaceAll(sbret.String(), "	", "")
-				charCount += len(chapterStr)
-
-				// writes to file
-				outputFile.Write([]byte(chapterStr))
-
-				// Close the itemref.
-				f.Close()
-
-				// clear the stringbuilder
-				sb.Reset()
-
-			}
-
-			//if overwriteSource is true, delete the original epub file
-			if overwriteSource {
-				err = os.Remove(filepath)
-				if err != nil {
-					log.Fatal(err)
-				}
-			}
-
-			// Close the rootfile.
-			rc.Close()
-
+		// if it is not an epub, skip it
+		if !strings.HasSuffix(file.Name(), ".epub") {
+			continue
 		}
-
+		charCount += ConvertSingleEpub(file, inputdir, overwriteSource)
 	}
+
+
 	if charCount > 0 {
 		elapsed := time.Since(start)
 		fmt.Printf("Parsing took %s, parsed %d characters at a rate of %d characters per second.\n", elapsed, charCount, int(float64(charCount)/elapsed.Seconds()))
 	}
+}
+
+
+func ConvertSingleEpub(file os.DirEntry, inputdir string, overwriteSource bool) int {
+	filepath := inputdir + "/" + file.Name()
+
+	charCount := 0
+	// we check if we are being rate limited, if we are,
+	// we don't parse the rest of the files (since they will be rate limited too)
+	isRateLimited := CheckRateLimit(filepath)
+	if isRateLimited {
+		log.Fatal("Rate limited by smashwords. Please try again later. (up to 500/24 hours)")
+	}
+
+	// We use the goreader library to parse the epub
+	rc, err := epub.OpenReader(filepath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// The rootfile (content.opf) lists all of the contents of an epub file.
+	// There may be multiple rootfiles, although typically there is only one.
+	book := rc.Rootfiles[0]
+
+	// Print book title.
+	fmt.Println("Parsing book: ", book.Title, "(file: ", file.Name()+")")
+
+	// stringbuilder to hold the text instead of using goreader's cell system
+	var sb strings.Builder
+
+	// generate output file name and file
+	outputFileName := strings.TrimSuffix(file.Name(), ".epub") + ".txt"
+	outputFilePath := inputdir + "/" + outputFileName
+	outputFile, err := os.Create(outputFilePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer outputFile.Close()
+
+	// iterate through each chapter in the book
+	for _, itemref := range book.Spine.Itemrefs {
+		f, err := itemref.Open()
+		if err != nil {
+			panic(err)
+		}
+
+		// parse the chapter into the stringbuilder
+		sbret, err := ParseText(f, book.Manifest.Items, sb)
+		if err != nil {
+			log.Fatal(err)
+		}
+		// get the string from the stringbuilder
+		chapterStr := strings.ReplaceAll(sbret.String(), "	", "")
+		charCount += len(chapterStr)
+
+		// writes to file
+		outputFile.Write([]byte(chapterStr))
+
+		// Close the itemref.
+		f.Close()
+
+		// clear the stringbuilder
+		sb.Reset()
+
+	}
+
+	//if overwriteSource is true, delete the original epub file
+	if overwriteSource {
+		err = os.Remove(filepath)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	// Close the rootfile.
+	rc.Close()
+
+	return charCount
+
 }
 
 // We check if we are being rate limited on epub files by scanning the epub downloaded for a string, returns true if we are being rate limited
@@ -319,5 +331,17 @@ func CheckRateLimit(inputdir string) bool {
 	if err := scanner.Err(); err != nil {
 		log.Fatal(err)
 	}
+
+
+	//we also check if the file is empty
+	fileInfo, err = file.Stat()
+	if err != nil {
+		log.Fatal(err)
+	}
+	if fileInfo.Size() == 0 {
+		log.Printf("File is empty, probably rate limited\n")
+		return true
+	}
+
 	return false
 }
