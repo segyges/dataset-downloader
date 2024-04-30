@@ -7,7 +7,7 @@ Contents:
 
 ## smashwords-downloader
 
-This script downloads plain text files of Western Romance books publicaly avaible on [Smashworks](https://www.smashwords.com/). This website has been used to create popular Machine Learning datasets like [BookCorpus](https://huggingface.co/datasets/bookcorpus).
+This script downloads plain text files of Western Romance books publicaly avaible on [Smashwords](https://www.smashwords.com/). This website has been used to create popular Machine Learning datasets like [BookCorpus](https://huggingface.co/datasets/bookcorpus).
 
 The source code located in `cmd/smashwords-downloader`. 
 It can be built into an executable with the command `go build -o main *.go`.
